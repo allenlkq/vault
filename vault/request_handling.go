@@ -45,7 +45,26 @@ func (c *Core) HandleRequest(req *logical.Request) (resp *logical.Response, err 
 			keyList = match[2]
 			req.Path = strings.Replace(req.Path, "/" + keyList, "", 1)
 		}
+	} else if (req.Operation == logical.UpdateOperation) && (strings.HasPrefix(req.Path, "secret/")) {
+		//support append by passing the __append__ key
+		if _, ok := req.Data["__append__"]; ok {
+			// read the current map
+			req2 := req
+			req2.Operation = logical.ReadOperation
+			var resp2, _, err2 = c.handleRequest(req2)
+			if (err2 == nil) && (resp2 != nil) {
+				// append
+				for k, v := range resp2.Data {
+					if _, ok := req.Data[k]; !ok {
+						req.Data[k] = v
+					}
+				}
+				delete(req.Data, "__append__")
+			}
+			req.Operation = logical.UpdateOperation
+		}
 	}
+
 
 	var auth *logical.Auth
 	if c.router.LoginPath(req.Path) {
