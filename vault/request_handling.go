@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/vault/helper/policyutil"
 	"github.com/hashicorp/vault/helper/strutil"
 	"github.com/hashicorp/vault/logical"
+	"regexp"
 )
 
 // HandleRequest is used to handle a new incoming request
@@ -35,6 +36,17 @@ func (c *Core) HandleRequest(req *logical.Request) (resp *logical.Response, err 
 		return logical.ErrorResponse("cannot write to a path ending in '/'"), nil
 	}
 
+	//remove key list from url, filter the result based on the key list later
+	var keyList string
+	if (req.Operation == logical.ReadOperation) && (strings.HasPrefix(req.Path, "secret/")) {
+		tokenReadPattern := regexp.MustCompile("^secret/([^/]+)/([a-zA-Z0-9_\\-\\|]+)")
+		match := tokenReadPattern.FindStringSubmatch(req.Path)
+		if match != nil {
+			keyList = match[2]
+			req.Path = strings.Replace(req.Path, "/" + keyList, "", 1)
+		}
+	}
+
 	var auth *logical.Auth
 	if c.router.LoginPath(req.Path) {
 		resp, auth, err = c.handleLoginRequest(req)
@@ -53,7 +65,7 @@ func (c *Core) HandleRequest(req *logical.Request) (resp *logical.Response, err 
 	}
 
 	//this logic only applys to read operation on secrets
-	if (req.Operation == logical.ReadOperation) && (strings.HasPrefix(req.Path, "secret/")) {
+	if (resp != nil) && (req.Operation == logical.ReadOperation) && (strings.HasPrefix(req.Path, "secret/")) {
 		linkedToken, ok := resp.Data["__link__"]
 		if ok && (linkedToken != nil) && (req.LinkTTL >= 1) {
 			req2 := req
@@ -69,6 +81,24 @@ func (c *Core) HandleRequest(req *logical.Request) (resp *logical.Response, err 
 			}
 			// remove __link__ from resp
 			delete(resp.Data, "__link__")
+		}
+		// filter out requested keys
+		if keyList != "" {
+			contains := func(ss []string, s string) bool {
+				for _, a := range ss {
+					if a == s {
+						return true
+					}
+				}
+				return false
+			}
+
+			keys := strings.Split(keyList, "|")
+			for k, _ := range resp.Data {
+				if !contains(keys, k) {
+					delete(resp.Data, k)
+				}
+			}
 		}
 	}
 
