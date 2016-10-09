@@ -166,6 +166,7 @@ func handleRequestForwarding(core *vault.Core, handler http.Handler) http.Handle
 // request is a helper to perform a request and properly exit in the
 // case of an error.
 func request(core *vault.Core, w http.ResponseWriter, rawReq *http.Request, r *logical.Request) (*logical.Response, bool) {
+	r.LinkTTL = 10 // support upto 10 links
 	resp, err := core.HandleRequest(r)
 	if errwrap.Contains(err, vault.ErrStandby.Error()) {
 		respondStandby(core, w, rawReq.URL)

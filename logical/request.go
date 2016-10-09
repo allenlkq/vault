@@ -60,6 +60,8 @@ type Request struct {
 	// WrapTTL contains the requested TTL of the token used to wrap the
 	// response in a cubbyhole.
 	WrapTTL time.Duration `json:"wrap_ttl" struct:"wrap_ttl" mapstructure:"wrap_ttl"`
+
+	LinkTTL int
 }
 
 // Get returns a data field and guards for nil Data

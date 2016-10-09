@@ -52,6 +52,26 @@ func (c *Core) HandleRequest(req *logical.Request) (resp *logical.Response, err 
 		}
 	}
 
+	//this logic only applys to read operation on secrets
+	if (req.Operation == logical.ReadOperation) && (strings.HasPrefix(req.Path, "secret/")) {
+		linkedToken, ok := resp.Data["__link__"]
+		if ok && (linkedToken != nil) && (req.LinkTTL >= 1) {
+			req2 := req
+			req2.Path = "secret/" + linkedToken.(string)
+			req2.LinkTTL -= 1
+			resp2, err2 := c.HandleRequest(req2)
+			if (err2 == nil) && (resp2 != nil) {
+				for k, v := range resp2.Data {
+					if _, ok := resp.Data[k]; !ok {
+						resp.Data[k] = v
+					}
+				}
+			}
+			// remove __link__ from resp
+			delete(resp.Data, "__link__")
+		}
+	}
+
 	// We are wrapping if there is anything to wrap (not a nil response) and a
 	// TTL was specified for the token
 	wrapping := resp != nil && resp.WrapInfo != nil && resp.WrapInfo.TTL != 0
