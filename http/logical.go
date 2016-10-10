@@ -12,9 +12,37 @@ import (
 	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/vault"
+	"regexp"
 )
 
 type PrepareRequestFunc func(req *logical.Request) error
+
+//TODO
+func convertHylaaRequest(r *http.Request) (*http.Request) {
+	authHeaderPattern := regexp.MustCompile("^Bearer ([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$")
+	tokenReadPattern := regexp.MustCompile("^/token/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/([a-zA-Z0-9_\\-\\|]+)$")
+	//tokenWritePattern := regexp.MustCompile("^/token/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$")
+	tokenNewPattern := regexp.MustCompile("^/token/new$")
+
+	// change Authentication bearer to X-Vault-Token
+	if authHeaderPattern.MatchString(r.Header.Get("Authentication")) {
+		xVaultToken := authHeaderPattern.FindStringSubmatch(r.Header.Get("Authentication"))[1]
+		r.Header.Set("X-Vault-Token",xVaultToken)
+	}
+
+	// read secret under token
+	if r.Method == "GET" && tokenReadPattern.MatchString(r.URL.Path) {
+		match := tokenReadPattern.FindStringSubmatch(r.URL.Path)
+		token := match[1]
+		keys := match[2]
+		r.URL.Path = "/v1/secret/" + token + "/" + keys
+
+
+	}else if tokenNewPattern.MatchString(r.URL.Path) {
+
+	}
+	return r
+}
 
 func buildLogicalRequest(w http.ResponseWriter, r *http.Request) (*logical.Request, int, error) {
 	// Determine the path...
@@ -89,6 +117,7 @@ func buildLogicalRequest(w http.ResponseWriter, r *http.Request) (*logical.Reque
 
 func handleLogical(core *vault.Core, dataOnly bool, prepareRequestCallback PrepareRequestFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r = convertHylaaRequest(r)
 		req, statusCode, err := buildLogicalRequest(w, r)
 		if err != nil || statusCode != 0 {
 			respondError(w, statusCode, err)

@@ -52,6 +52,8 @@ func Handler(core *vault.Core) http.Handler {
 	mux.Handle("/v1/sys/", handleRequestForwarding(core, handleLogical(core, true, nil)))
 	mux.Handle("/v1/", handleRequestForwarding(core, handleLogical(core, false, nil)))
 
+	mux.Handle("/token/", handleRequestForwarding(core, handleLogical(core, false, nil)))
+
 	// Wrap the handler in another handler to trigger all help paths.
 	handler := handleHelpHandler(mux, core)
 
