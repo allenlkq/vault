@@ -4,11 +4,12 @@ import (
 	"regexp"
 	"net/http"
 	"github.com/hashicorp/vault/logical"
-	"github.com/hashicorp/vault/helper/jsonutil"
-
 	"io/ioutil"
-	"bytes"
 	"encoding/json"
+	"bytes"
+	"time"
+	"strings"
+	"github.com/hashicorp/go-uuid"
 )
 
 var (
@@ -44,24 +45,38 @@ func ConvertFromHylaaRequest(req *http.Request) (*http.Request) {
 		json.Unmarshal(payload, &data)
 		keyList := data["key_list"].(map[string]interface {})
 		keyList["__append__"] = "1"
-		keyListBytes,_ := jsonutil.EncodeJSON(keyList)
+		keyListBytes,_ := json.Marshal(keyList)
 		req.Body = ioutil.NopCloser(bytes.NewBuffer(keyListBytes))
-	}else if tokenNewPattern.MatchString(req.URL.Path) {
-
+	}else if req.Method == "POST" && tokenNewPattern.MatchString(req.URL.Path) {
+		token, _ := uuid.GenerateUUID()
+		req.URL.Path = "/v1/secret/" + token
+		payload, _ := ioutil.ReadAll(req.Body)
+		var data map[string]interface{}
+		json.Unmarshal(payload, &data)
+		keyList := data["key_list"].(map[string]interface {})
+		keyListBytes,_ := json.Marshal(keyList)
+		req.Body = ioutil.NopCloser(bytes.NewBuffer(keyListBytes))
 	}
 	return req
 }
 
 func ConvertToHylaaResponse(req *logical.Request,  resp interface{}) (interface{}) {
-	var respBody interface{} = resp
 	if req.Operation == logical.ReadOperation && tokenReadPattern.MatchString(req.HylaaPath) {
 		if(resp !=nil){
-			respBody = resp.(*logical.HTTPResponse).Data
+			return resp.(*logical.HTTPResponse).Data
 		}
 	}else if req.Operation == logical.UpdateOperation && tokenWritePattern.MatchString(req.HylaaPath) {
+		var respBody interface{}
 		json.Unmarshal([]byte(`{"status": "active"}`), &respBody)
+		return respBody
+	}else if req.Operation == logical.CreateOperation && tokenNewPattern.MatchString(req.HylaaPath) {
+		token := strings.Replace(req.Path, "secret/", "", 1)
+		var respBody = make(map[string]string)
+		respBody["token"] = token
+		respBody["create_date"] = time.Now().Format(time.RFC3339)
+		return respBody
 	}
-	return respBody
+	return resp
 }
 
 
