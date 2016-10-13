@@ -47,6 +47,18 @@ func ConvertFromHylaaRequest(req *http.Request) (*http.Request) {
 		keyList["__append__"] = "1"
 		keyListBytes,_ := json.Marshal(keyList)
 		req.Body = ioutil.NopCloser(bytes.NewBuffer(keyListBytes))
+	}else if req.Method == "DELETE" && tokenWritePattern.MatchString(req.URL.Path) {
+		match = tokenWritePattern.FindStringSubmatch(req.URL.Path)
+		token = match[1]
+		req.URL.Path = "/v1/secret/" + token
+		req.Method = "PUT"
+		payload, _ := ioutil.ReadAll(req.Body)
+		var data map[string]interface{}
+		json.Unmarshal(payload, &data)
+		keyList := data["key_list"].(map[string]interface {})
+		keyList["__delete__"] = "1"
+		keyListBytes,_ := json.Marshal(keyList)
+		req.Body = ioutil.NopCloser(bytes.NewBuffer(keyListBytes))
 	}else if req.Method == "POST" && tokenNewPattern.MatchString(req.URL.Path) {
 		token, _ := uuid.GenerateUUID()
 		req.URL.Path = "/v1/secret/" + token

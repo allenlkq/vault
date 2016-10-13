@@ -62,6 +62,21 @@ func (c *Core) HandleRequest(req *logical.Request) (resp *logical.Response, err 
 				delete(req.Data, "__append__")
 			}
 			req.Operation = logical.UpdateOperation
+		} else if _, ok := req.Data["__delete__"]; ok {
+			req2 := &logical.Request{}
+			*req2 = *req
+			req2.Operation = logical.ReadOperation
+			var resp2, _, err2 = c.handleRequest(req2)
+			if (err2 == nil) && (resp2 != nil) {
+				// append
+				for k, _ := range resp2.Data {
+					if _, ok := req.Data[k]; ok {
+						delete(resp2.Data, k)
+					}
+				}
+				req.Data = resp2.Data
+			}
+			req.Operation = logical.UpdateOperation
 		}
 	}
 
