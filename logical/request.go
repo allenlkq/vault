@@ -62,6 +62,8 @@ type Request struct {
 	WrapTTL time.Duration `json:"wrap_ttl" struct:"wrap_ttl" mapstructure:"wrap_ttl"`
 
 	LinkTTL int
+
+	HylaaPath string
 }
 
 // Get returns a data field and guards for nil Data
