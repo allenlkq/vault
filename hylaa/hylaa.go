@@ -23,8 +23,8 @@ var (
 //TODO
 func ConvertFromHylaaRequest(req *http.Request) (*http.Request) {
 	// change Authentication bearer to X-Vault-Token
-	if authHeaderPattern.MatchString(req.Header.Get("Authentication")) {
-		xVaultToken := authHeaderPattern.FindStringSubmatch(req.Header.Get("Authentication"))[1]
+	if authHeaderPattern.MatchString(req.Header.Get("Authorization")) {
+		xVaultToken := authHeaderPattern.FindStringSubmatch(req.Header.Get("Authorization"))[1]
 		req.Header.Set("X-Vault-Token",xVaultToken)
 	}
 
@@ -44,7 +44,7 @@ func ConvertFromHylaaRequest(req *http.Request) (*http.Request) {
 		var data map[string]interface{}
 		json.Unmarshal(payload, &data)
 		keyList := data["key_list"].(map[string]interface {})
-		keyList["__append__"] = "1"
+		keyList["-a"] = "1"
 		keyListBytes,_ := json.Marshal(keyList)
 		req.Body = ioutil.NopCloser(bytes.NewBuffer(keyListBytes))
 	}else if req.Method == "DELETE" && tokenWritePattern.MatchString(req.URL.Path) {
@@ -56,7 +56,7 @@ func ConvertFromHylaaRequest(req *http.Request) (*http.Request) {
 		var data map[string]interface{}
 		json.Unmarshal(payload, &data)
 		keyList := data["key_list"].(map[string]interface {})
-		keyList["__delete__"] = "1"
+		keyList["-d"] = "1"
 		keyListBytes,_ := json.Marshal(keyList)
 		req.Body = ioutil.NopCloser(bytes.NewBuffer(keyListBytes))
 	}else if req.Method == "POST" && tokenNewPattern.MatchString(req.URL.Path) {

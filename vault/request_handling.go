@@ -46,8 +46,8 @@ func (c *Core) HandleRequest(req *logical.Request) (resp *logical.Response, err 
 			req.Path = strings.Replace(req.Path, "/" + keyList, "", 1)
 		}
 	} else if (req.Operation == logical.UpdateOperation) && (strings.HasPrefix(req.Path, "secret/")) {
-		//support append by passing the __append__ key
-		if _, ok := req.Data["__append__"]; ok {
+		//support append by passing the "-a" key
+		if _, ok := req.Data["-a"]; ok {
 			// read the current map
 			req2 := req
 			req2.Operation = logical.ReadOperation
@@ -59,10 +59,11 @@ func (c *Core) HandleRequest(req *logical.Request) (resp *logical.Response, err 
 						req.Data[k] = v
 					}
 				}
-				delete(req.Data, "__append__")
+				delete(req.Data, "-a")
 			}
 			req.Operation = logical.UpdateOperation
-		} else if _, ok := req.Data["__delete__"]; ok {
+		} else if _, ok := req.Data["-d"]; ok {
+			//support delete by passing the "-d" key
 			req2 := &logical.Request{}
 			*req2 = *req
 			req2.Operation = logical.ReadOperation
@@ -79,7 +80,6 @@ func (c *Core) HandleRequest(req *logical.Request) (resp *logical.Response, err 
 			req.Operation = logical.UpdateOperation
 		}
 	}
-
 
 	var auth *logical.Auth
 	if c.router.LoginPath(req.Path) {
@@ -98,10 +98,10 @@ func (c *Core) HandleRequest(req *logical.Request) (resp *logical.Response, err 
 		}
 	}
 
-	//this logic only applys to read operation on secrets
-	if (resp != nil) && (req.Operation == logical.ReadOperation) && (strings.HasPrefix(req.Path, "secret/")) {
-		linkedToken, ok := resp.Data["__link__"]
-		if ok && (linkedToken != nil) && (req.LinkTTL >= 1) {
+	//this logic only applys to hylaa read operation on secrets
+	if (resp != nil) && (req.Operation == logical.ReadOperation) && (strings.HasPrefix(req.Path, "secret/")) && (strings.HasPrefix(req.HylaaPath, "/token/")) {
+		linkedToken, linked := resp.Data["__link__"]
+		if linked && (linkedToken != nil) && (req.LinkTTL >= 1) {
 			req2 := req
 			req2.Path = "secret/" + linkedToken.(string)
 			req2.LinkTTL -= 1
@@ -201,7 +201,7 @@ func (c *Core) handleRequest(req *logical.Request) (retResp *logical.Response, r
 					retErr = multierror.Append(retErr, ErrInternalError)
 				}
 				if retResp != nil && retResp.Secret != nil &&
-					// Some backends return a TTL even without a Lease ID
+				// Some backends return a TTL even without a Lease ID
 					retResp.Secret.LeaseID != "" {
 					retResp = logical.ErrorResponse("Secret cannot be returned; token had one use left, so leased credentials were immediately revoked.")
 					return
@@ -387,7 +387,7 @@ func (c *Core) handleLoginRequest(req *logical.Request) (*logical.Response, *log
 		source = strings.Replace(source, "/", "-", -1)
 
 		// Prepend the source to the display name
-		auth.DisplayName = strings.TrimSuffix(source+auth.DisplayName, "-")
+		auth.DisplayName = strings.TrimSuffix(source + auth.DisplayName, "-")
 
 		sysView := c.router.MatchingSystemView(req.Path)
 		if sysView == nil {
